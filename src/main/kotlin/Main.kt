@@ -1,7 +1,6 @@
 package io.offscale
 
 import com.github.ajalt.clikt.core.*
-import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.versionOption
 import com.github.ajalt.clikt.parameters.types.enum
