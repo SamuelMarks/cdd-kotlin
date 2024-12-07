@@ -2,6 +2,38 @@ cdd-kotlin
 ==========
 
 OpenAPI ↔ Kotlin: Compiler Driven Development for Kotlin. 
+
+## Usage
+
+    Usage: cdd-kotlin [<options>] <command> [<args>]...
+    
+    Options:
+    --version   Show the version and exit
+    -h, --help  Show this message and exit
+    
+    Commands:
+    sync
+    emit
+
+### `sync`
+
+    Usage: cdd-kotlin sync [<options>]
+    
+    Options:
+    --truth=<path>  the correct starting point, e.g., the ktor client
+    --generate=(ktorClient|ktorClientTests|viewModel)
+    what to generate, * to generate everything (default)
+    -h, --help      Show this message and exit
+
+### `emit`
+
+    Usage: cdd-kotlin emit [<options>]
+    
+    Options:
+    --replace-existing=true|false  whether to override any existing file
+    --filename=<path>              path to OpenAPI file, default: ./openapi.json
+    -h, --help                     Show this message and exit
+
 <hr/>
 
 ## License

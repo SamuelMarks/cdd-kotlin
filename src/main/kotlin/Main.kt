@@ -1,10 +1,13 @@
 package io.offscale
 
 import com.github.ajalt.clikt.core.*
+import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.versionOption
+import com.github.ajalt.clikt.parameters.types.boolean
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.file
+import java.io.File
 
 class CddKotlin : CliktCommand() {
     init {
@@ -29,12 +32,15 @@ class Sync : CliktCommand() {
     }
 }
 
-class EmitOpenApiConfig(val replaceExisting: Boolean)
-
 class Emit : CliktCommand() {
-    private val openapi by requireObject<EmitOpenApiConfig>()
+    private val replaceExisting by option(help="whether to override any existing file")
+        .boolean()
+    private val filename by option(help="path to OpenAPI file, default: ./openapi.json")
+        .file(canBeDir = false)
+        .default(File("./openapi.json"))
+
     override fun run() {
-        print("[Emit] ${openapi.replaceExisting}")
+        print("[Emit] $replaceExisting $filename")
     }
 }
 
