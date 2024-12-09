@@ -1,6 +1,8 @@
 cdd-kotlin
 ==========
 
+[![License](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 OpenAPI ↔ Kotlin: Compiler Driven Development for Kotlin. 
 
 ## Usage
@@ -33,6 +35,17 @@ OpenAPI ↔ Kotlin: Compiler Driven Development for Kotlin.
     --replace-existing=true|false  whether to override any existing file
     --filename=<path>              path to OpenAPI file, default: ./openapi.json
     -h, --help                     Show this message and exit
+
+## Related work
+    
+  | Language             | Compiler                                               |
+  | -------------------- | ------------------------------------------------------ |
+  | Python               | [cdd-python](https://github.com/offscale/cdd-python)   |
+  | C                    | [cdd-c](https://github.com/SamuelMarks/cdd-c)          |
+  | Java (Android)       | [cdd-java](https://github.com/offscale/cdd-java)       |
+  | Swift (iOS)          | [cdd-swift](https://github.com/offscale/cdd-swift-ios) |
+  | TypeScript (Angular) | [cdd-ts-ng](https://github.com/offscale/cdd-ts-ng)     |
+  | Rust                 | [cdd-rust](https://github.com/offscale/cdd-rust)       |
 
 <hr/>
 
