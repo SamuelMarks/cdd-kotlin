@@ -196,6 +196,61 @@ class Converter {
 
     }
 
+    fun generateViewModel(schema: Map<String, Any?>): String {
+        val className = schema["title"] as String
+        val properties = schema["properties"] as? Map<String, Map<String, Any?>> ?: emptyMap()
+        val requiredFields = (schema["required"] as? List<String>) ?: emptyList()
+
+        val classBuilder = StringBuilder()
+        classBuilder.append("import kotlinx.coroutines.flow.MutableStateFlow\n")
+        classBuilder.append("import kotlinx.coroutines.flow.StateFlow\n")
+        classBuilder.append("import kotlinx.coroutines.CoroutineScope\n")
+        classBuilder.append("import kotlinx.coroutines.Dispatchers\n")
+        classBuilder.append("import kotlinx.coroutines.launch\n")
+        classBuilder.append("import com.example.parsing.example.repository.${className}Repository\n\n")
+        classBuilder.append("class ${className}ViewModel(private val repository: ${className}Repository) {\n")
+        classBuilder.append("    val scope = CoroutineScope(Dispatchers.Main)\n\n")
+
+        properties.forEach { (key, property) ->
+            val type = mapJsonTypeToKotlin(property["type"] as? String ?: "Any")
+            classBuilder.append("    private val _${key} = MutableStateFlow<$type?>(null)\n")
+            classBuilder.append("    val $key: StateFlow<$type?> get() = _${key}\n\n")
+        }
+
+        classBuilder.append(
+            """
+            /** Here should be implemented the functions for the view model:
+            *
+            * Example:
+            * fun loadCat() {
+            *     scope.launch {
+            *         try {
+            *             val allCat = repository.getAllCat()
+            *             _cats.value = allCat
+            *         }catch (e: Exception) {
+            *             _error.value = "Failed to load Cat"
+            *         }
+            *     }
+            * }
+            */
+        """.trimIndent()
+        )
+        // Todo: Perhaps, should I also create a mode in which all the routes, repos and viewmodels come
+        //  ready accordingly to the json Schema ?
+        //classBuilder.append("    fun load$className() {\n")
+        //classBuilder.append("        scope.launch {\n")
+        //classBuilder.append("            try {\n")
+        //classBuilder.append("                val all$className = repository.getAll$className()\n")
+        //classBuilder.append("                _${className.lowercase()}s.value = all$className\n")
+        //classBuilder.append("            } catch (e: Exception) {\n")
+        //classBuilder.append("                _error.value = \"Failed to load $className\"\n")
+        //classBuilder.append("            }\n")
+        //classBuilder.append("        }\n")
+        //classBuilder.append("    }\n")
+
+        classBuilder.append("\n}\n")
+        return classBuilder.toString()
+    }
 
     fun mapJsonTypeToKotlin(jsonType: String): String {
         return when (jsonType) {
