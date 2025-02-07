@@ -1,6 +1,6 @@
-package com.example.parsing.example.repository
+package io.offscale.example.repository
 
-import com.example.parsing.example.models.Cat
+import io.offscale.example.models.Cat
 
 class CatRepository {
     private val cats = mutableListOf(

@@ -1,10 +1,10 @@
-package com.example.parsing.converter
+package io.offscale.converter
 
-import com.example.parsing.lexer.Lexer
-import com.example.parsing.parser.ClassBlock
-import com.example.parsing.parser.KtorRouteBlock
-import com.example.parsing.parser.Parser
-import com.example.parsing.parser.SourceBlock
+import io.offscale.lexer.Lexer
+import io.offscale.parser.ClassBlock
+import io.offscale.parser.KtorRouteBlock
+import io.offscale.parser.Parser
+import io.offscale.parser.SourceBlock
 import org.yaml.snakeyaml.DumperOptions
 import org.yaml.snakeyaml.Yaml
 import java.io.File
@@ -207,7 +207,7 @@ class Converter {
         classBuilder.append("import kotlinx.coroutines.CoroutineScope\n")
         classBuilder.append("import kotlinx.coroutines.Dispatchers\n")
         classBuilder.append("import kotlinx.coroutines.launch\n")
-        classBuilder.append("import com.example.parsing.example.repository.${className}Repository\n\n")
+        classBuilder.append("import io.offscale.example.repository.${className}Repository\n\n")
         classBuilder.append("class ${className}ViewModel(private val repository: ${className}Repository) {\n")
         classBuilder.append("    val scope = CoroutineScope(Dispatchers.Main)\n\n")
 
@@ -217,7 +217,7 @@ class Converter {
             classBuilder.append("    val $key: StateFlow<$type?> get() = _${key}\n\n")
         }
 
-        classBuilder.append(
+        classBuilder.append("\t"+
             """
             /** Here should be implemented the functions for the view model:
             *
@@ -233,7 +233,7 @@ class Converter {
             *     }
             * }
             */
-        """.trimIndent()
+        """
         )
         // Todo: Perhaps, should I also create a mode in which all the routes, repos and viewmodels come
         //  ready accordingly to the json Schema ?
@@ -247,6 +247,35 @@ class Converter {
         //classBuilder.append("            }\n")
         //classBuilder.append("        }\n")
         //classBuilder.append("    }\n")
+
+        classBuilder.append("\n}\n")
+        return classBuilder.toString()
+    }
+    fun generateRepository(schema: Map<String, Any?>): String {
+        val className = schema["title"] as String
+        val classBuilder = StringBuilder()
+
+        classBuilder.append("package io.offscale.example.repository\n\n")
+        classBuilder.append("import io.offscale.example.models.$className\n\n")
+
+        classBuilder.append("class ${className}Repository{\n")
+        classBuilder.append("    private val ${className.lowercase()}s : MutableList<$className> = mutableListOf()\n\n")
+
+        classBuilder.append("\t"+
+            """ 
+            /** Here should be implemented the functions for the repository:
+            *
+            * Example:
+            *  fun getAllCats(): List<Cat> = cats
+            *
+            *  fun getCatByName(name: String): Cat? = cats.find { it.name == name }
+            *
+            *  fun addCat(cat: Cat) {
+            *        cats.add(cat)
+            *    }
+            */
+        """
+        )
 
         classBuilder.append("\n}\n")
         return classBuilder.toString()
@@ -491,7 +520,8 @@ fun main() {
     val sourceClass = parserClass.parseCode() as SourceBlock
     val dataClass = parserClass.findBlock(sourceClass, ClassBlock::class) as ClassBlock
     var classDict = converter.IrToJsonSchema(dataClass.structure, sourceClass.kdoc)
-
+    var view = converter.generateViewModel(classDict)
+    File(rootPath + "repository.kt").writeText(view)
     //print(view)
 
 }

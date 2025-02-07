@@ -1,8 +1,8 @@
-package com.example.parsing.example.viewmodel
+package io.offscale.example.viewmodel
 
 
-import com.example.parsing.example.models.Cat
-import com.example.parsing.example.repository.CatRepository
+import io.offscale.example.models.Cat
+import io.offscale.example.repository.CatRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch

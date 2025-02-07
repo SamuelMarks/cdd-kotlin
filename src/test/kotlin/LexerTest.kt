@@ -1,9 +1,9 @@
 package com.example.lexer
 
 
-import com.example.parsing.lexer.Lexer
-import com.example.parsing.lexer.Token
-import com.example.parsing.lexer.TokenType
+import io.offscale.lexer.Lexer
+import io.offscale.lexer.Token
+import io.offscale.lexer.TokenType
 import org.junit.Test
 import java.io.File
 import kotlin.test.assertEquals

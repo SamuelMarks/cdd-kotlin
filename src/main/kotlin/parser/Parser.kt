@@ -1,4 +1,4 @@
-package com.example.parsing.parser
+package io.offscale.parser
 
 import kotlin.collections.mutableListOf
 import java.io.File
@@ -8,8 +8,8 @@ import kotlinx.serialization.json.jsonObject
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.DumperOptions
 import kotlin.reflect.KClass
-import com.example.parsing.lexer.Token
-import com.example.parsing.lexer.*
+import io.offscale.lexer.Token
+import io.offscale.lexer.*
 
 
 abstract class Block(var name: String, var content: MutableList<Any>) {

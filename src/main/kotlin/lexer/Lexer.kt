@@ -1,4 +1,4 @@
-package com.example.parsing.lexer
+package io.offscale.lexer
 
 import java.io.File
 

@@ -1,4 +1,4 @@
-package com.example.parsing.lexer.scripts
+package io.offscale.scripts
 
 fun evenOrOdd(number: Int){
     if (number % 2 == 0){

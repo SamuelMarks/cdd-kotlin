@@ -1,7 +1,7 @@
-package com.example.parsing.example.api
+package io.offscale.example.api
 
-import com.example.parsing.example.models.Cat
-import com.example.parsing.example.repository.CatRepository
+import io.offscale.example.models.Cat
+import io.offscale.example.repository.CatRepository
 
 import io.ktor.server.application.*
 import io.ktor.server.response.*

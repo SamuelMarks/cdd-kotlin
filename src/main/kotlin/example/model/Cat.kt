@@ -1,4 +1,4 @@
-package com.example.parsing.example.models
+package io.offscale.example.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
