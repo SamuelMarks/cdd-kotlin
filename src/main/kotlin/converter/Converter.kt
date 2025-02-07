@@ -281,6 +281,84 @@ class Converter {
         return classBuilder.toString()
     }
 
+    fun generateTestModel(schema: Map<String, Any?>): String {
+        val className = schema["title"] as String
+        val classBuilder = StringBuilder()
+
+        classBuilder.append("package io.offscale.example.tests\n\n")
+        classBuilder.append("import kotlinx.serialization.json.Json\n")
+        classBuilder.append("import org.junit.Test\n\n")
+
+        classBuilder.append("class ${className}Test {\n")
+        classBuilder.append("\tprivate val json = Json { prettyPrint = true }\n\n")
+        classBuilder.append("\t@Test\n")
+        classBuilder.append("\tfun modelTest() {\n" +
+                "        // Here is where the tests should happen and you can add more. \n" +
+                "    }\n")
+
+
+        classBuilder.append("}\n")
+        return classBuilder.toString()
+
+    }
+
+
+
+
+    fun generateTestViewModel(schema: Map<String, Any?>): String {
+        val className = schema["title"] as String
+        val classBuilder = StringBuilder()
+
+        classBuilder.append("package io.offscale.example.tests\n\n")
+        classBuilder.append("import io.offscale.example.repository.${className}Repository\n")
+        classBuilder.append("import io.offscale.example.viewmodel.${className}ViewModel\n")
+        classBuilder.append("import org.junit.Test\n")
+        classBuilder.append("import org.junit.Before\n")
+        classBuilder.append("import org.mockito.kotlin.mock\n\n")
+
+        classBuilder.append("class ${className}ViewModelTest {\n")
+        classBuilder.append("\tprivate lateinit var viewModel: ${className}ViewModel\n")
+        classBuilder.append("\tprivate val repository: ${className}Repository = mock()\n\n")
+        classBuilder.append("\t@Before\n")
+        classBuilder.append("\tfun setUp() {\n" +
+                "        // Here is where the viewmodel is initialized, before each test. \n" +
+                "    }\n")
+        classBuilder.append("\t@Test\n")
+        classBuilder.append("\tfun ViewmodelTest() {\n" +
+                "        // Here is where the tests should happen and you can add more. \n" +
+                "    }\n")
+
+
+        classBuilder.append("}\n")
+        return classBuilder.toString()
+
+    }
+
+    fun generateTestRepository(schema: Map<String, Any?>): String {
+        val className = schema["title"] as String
+        val classBuilder = StringBuilder()
+
+        classBuilder.append("package io.offscale.example.tests\n\n")
+        classBuilder.append("import org.junit.Test\n")
+        classBuilder.append("import kotlin.test.assertEquals\n")
+        classBuilder.append("import kotlin.test.assertNull\n")
+        classBuilder.append("import io.offscale.example.repository.${className}Repository\n\n")
+
+        classBuilder.append("class ${className}RepositoryTest {\n")
+
+        classBuilder.append("\tprivate val repository = ${className}Repository()\n\n")
+        classBuilder.append("\t@Test\n")
+        classBuilder.append("\tfun modelTest() {\n" +
+                "        // Here is where the tests should happen and you can add more. \n" +
+                "    }\n")
+
+
+
+        classBuilder.append("}\n")
+
+        return classBuilder.toString()
+    }
+
     fun mapJsonTypeToKotlin(jsonType: String): String {
         return when (jsonType) {
             "string" -> "String"
@@ -521,7 +599,14 @@ fun main() {
     val dataClass = parserClass.findBlock(sourceClass, ClassBlock::class) as ClassBlock
     var classDict = converter.IrToJsonSchema(dataClass.structure, sourceClass.kdoc)
     var view = converter.generateViewModel(classDict)
-    File(rootPath + "repository.kt").writeText(view)
-    //print(view)
+    var repo = converter.generateRepository(classDict)
+    var testmodel = converter.generateTestModel(classDict)
+    var testViewModel = converter.generateTestViewModel(classDict)
+    var testRepository = converter.generateTestRepository(classDict)
+    //File(rootPath + "repository.kt").writeText(repo)
+    //File(rootPath+ "viewmodel.kt").writeText(view)
+    //File(rootPath+"testmodel.kt").writeText(testmodel)
+    File(rootPath+"testRepository.kt").writeText(testRepository)
+    //File(rootPath+"testViewmodel.kt").writeText(testViewModel)
 
 }

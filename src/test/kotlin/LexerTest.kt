@@ -20,6 +20,7 @@ class LexerTest {
         return Token(TokenType.EOF, "", listOf(pos, pos))
     }
 
+
     @Test
     fun tokenizerTest() {
         val lexer = Lexer("fun")

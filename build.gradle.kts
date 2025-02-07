@@ -12,7 +12,11 @@ repositories {
 dependencies {
     testImplementation(kotlin("test"))
     implementation("com.github.ajalt.clikt:clikt:5.0.2")
+    // For tests Junit4
     testImplementation("junit:junit:4.13.2")
+
+    // For mockito
+    testImplementation("org.mockito.kotlin:mockito-kotlin:4.0.0")
 
     // optional support for rendering markdown in help messages
     implementation("com.github.ajalt.clikt:clikt-markdown:5.0.2")
@@ -28,5 +32,5 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnit() // JUnit4 if JUnit5 -> usejUnitPlatform()
 }
