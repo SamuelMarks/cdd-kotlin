@@ -1,5 +1,6 @@
 package io.offscale.parser
 
+import io.offscale.converter.Converter
 import kotlin.collections.mutableListOf
 import java.io.File
 import kotlinx.serialization.json.Json
@@ -157,7 +158,7 @@ class FunctionBlock(content: MutableList<Any>) : Block("Function", content) {
 
 
 class ArgumentsBlock(content: MutableList<Any>) : Block("Arguments", content) {
-    var arguments: MutableList<MutableMap<String, String?>> = mutableListOf()
+    var arguments: MutableList<MutableMap<String, Any>> = mutableListOf()
 
     init {
         for (item in content) {
@@ -172,7 +173,7 @@ class ArgumentsBlock(content: MutableList<Any>) : Block("Arguments", content) {
 }
 
 class VarArgumentBlock(content: MutableList<Any>) : Block("VarArgument", content) {
-    var argument: MutableMap<String, String?> = mutableMapOf()
+    var argument: MutableMap<String, Any> = mutableMapOf()
 
     init {
         for (item in content) {
@@ -182,14 +183,14 @@ class VarArgumentBlock(content: MutableList<Any>) : Block("VarArgument", content
                 is StringBlock -> argument["default"] = item.toCode()
                 is NumberBlock -> argument["default"] = item.toCode()
                 is AnnotationBlock -> argument["alias"] = item.alias
-                // TODO: Implement the required values
+
             }
         }
     }
 }
 
 class ValArgumentBlock(content: MutableList<Any>) : Block("ValArgument", content) {
-    var argument: MutableMap<String, String?> = mutableMapOf()
+    var argument: MutableMap<String, Any> = mutableMapOf()
 
     init {
         for (item in content) {
@@ -205,7 +206,7 @@ class ValArgumentBlock(content: MutableList<Any>) : Block("ValArgument", content
 }
 
 class ArgumentBlock(content: MutableList<Any>) : Block("Argument", content) {
-    var argument: MutableMap<String, String?> = mutableMapOf()
+    var argument: MutableMap<String, Any> = mutableMapOf()
 
     init {
         for (item in content) {
@@ -232,12 +233,19 @@ class IdentifierBlock(content: MutableList<Any>) : Block("Identifier", content) 
 }
 
 class TypeBlock(content: MutableList<Any>) : Block("Type", content) {
-    lateinit var type: String
+     var type: MutableMap<String,Any> = mutableMapOf()
 
     init {
         for (item in content) {
-            if (item is IdentifierBlock) type = item.value
+            if (item is IdentifierBlock) {
+                type["type"] = item.value
+            } else if (item is ListBlock) {
+                type["value"] = item.value
+            } else if (item is MapBlock){
+                type["value"] = item.map
+            }
         }
+
     }
 }
 
@@ -302,6 +310,48 @@ class KtorRouteBlock(content: MutableList<Any>) : Block("KtorRoute", content) {
             if (item is KtorMethodBlock)
                 routes.getOrPut(rootRoute+item.subroute) { mutableListOf() }.add(item.kdoc)
         }
+    }
+}
+
+class ListBlock(content: MutableList<Any>) : Block("List",content) {
+    lateinit var value: String
+
+    init {
+        for (item in content) {
+            if (item is IdentifierBlock)
+                value = item.value
+        }
+    }
+}
+
+
+class MapBlock(content: MutableList<Any>) : Block("Map", content) {
+    var map: MutableMap<String,Any> = mutableMapOf()
+
+    init {
+        for (item in content) {
+            if (item is KeyBlock)
+                map["key"] = item.value
+            else if (item is ValueBlock)
+                map["value"] = item.value
+        }
+    }
+}
+
+class KeyBlock(content: MutableList<Any>) : Block("Key", content) {
+    lateinit var value: String
+
+    init {
+        val item = content[0]
+        if (item is IdentifierBlock) value = item.value
+    }
+}
+class ValueBlock(content: MutableList<Any>) : Block("Value", content) {
+    lateinit var value: String
+
+    init {
+        val item = content[0]
+        if (item is IdentifierBlock) value = item.value
     }
 }
 
@@ -995,6 +1045,8 @@ class Parser(val tokens: List<Token>) {
 
 
     fun parserType(): Block {
+        val listTypes = listOf("List","MutableList","ArrayList")
+        val mapTypes = listOf("Map","MutableList","HashMap","SortedMap")
         var elements = mutableListOf<Any>()
         verifyWhiteSpace(elements)
         if (actualToken.type != TokenType.COLON) throw Error("expected ':' , instead got: $actualToken")
@@ -1003,8 +1055,59 @@ class Parser(val tokens: List<Token>) {
         verifyWhiteSpace(elements)
         if (actualToken.type != TokenType.IDENTIFIER) throw Error("expected identifier, instead got: $actualToken")
         elements.add(IdentifierBlock(mutableListOf(actualToken)))
-        consumeToken()
+        if(listTypes.contains(actualToken.value) || mapTypes.contains(actualToken.value))
+            elements.add(parserMapOrList())
+        else
+            consumeToken()
         return TypeBlock(elements)
+    }
+
+    fun parserMapOrList(): Block {
+        val listTypes = listOf("List","MutableList","ArrayList")
+        val mapTypes = listOf("Map","MutableList","HashMap","SortedMap")
+        var elements = mutableListOf<Any>()
+
+        if(listTypes.contains(actualToken.value)) {
+            consumeToken()
+            verifyWhiteSpace(elements)
+            if(actualToken.type==TokenType.LESS){
+                elements.add(actualToken)
+                consumeToken()
+                verifyWhiteSpace(elements)
+                elements.add(parserMapOrList())
+                if(actualToken.type==TokenType.GREATER){
+                    elements.add(actualToken)
+                    consumeToken()
+                    verifyWhiteSpace(elements)
+                    return ListBlock(elements)
+                }
+            }
+        } else if (mapTypes.contains(actualToken.value)) {
+            consumeToken()
+            verifyWhiteSpace(elements)
+            if(actualToken.type==TokenType.LESS){
+                elements.add(actualToken)
+                consumeToken()
+                verifyWhiteSpace(elements)
+                elements.add(KeyBlock(mutableListOf(parserMapOrList())))
+                if(actualToken.type!=TokenType.COMMA) throw Error("parserMapOrList: expected ',', instead got: $actualToken")
+                elements.add(actualToken)
+                consumeToken()
+                verifyWhiteSpace(elements)
+                elements.add(ValueBlock(mutableListOf(parserMapOrList())))
+                if(actualToken.type==TokenType.GREATER){
+                    elements.add(actualToken)
+                    consumeToken()
+                    verifyWhiteSpace(elements)
+                    return MapBlock(elements)
+                }
+            }
+        }
+        elements.add(actualToken)
+        consumeToken()
+        verifyWhiteSpace(elements)
+        return IdentifierBlock(elements)
+
     }
 
 
@@ -1274,25 +1377,22 @@ fun main() {
     }
 
     val filePath =
-        "C:\\Users\\jeans\\Desktop\\Parsing\\composeApp\\src\\desktopMain\\kotlin\\com\\example\\parsing\\lexer\\test_input.txt"
+        "C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\lexer\\test_input.txt"
     val code = File(filePath).readText().replace("\r\n", "\n")
     val lexer = Lexer(code)
     val tokens = lexer.tokenize()
     val tokensTypes = lexer.extractTokenTypes(tokens)
     val parser = Parser(tokens)
-    val block = parser.parseCode().content[2] as KtorRouteBlock
-    var routeDict = block.routes
-  /*  for (route in routeDict) {
-        println(route)
-        println("\n\n\n")
-    }*/
-  /*  if (block is ClassBlock) {
-        var ir = block.structure
-        var jsonSchema = parser.convertToJsonSchema(ir)
-        println(jsonSchema)
-        println("\n\n")
-        print(parser.convertJsonSchemaToIr(jsonSchema))
-    }
-    */
+    val block = parser.parseCode() as SourceBlock
+    val kdoc = block.kdoc
+    val classBlock = parser.findBlock(block,ClassBlock::class) as ClassBlock
+    val map = classBlock.structure
+    val conv = Converter()
+    val jsonschema = conv.IrToJsonSchema(map,kdoc)
+    print(map)
+    print("\n\n")
+    print(jsonschema)
+    print("\n\n")
+    print(conv.jsonSchemaToIr(jsonschema))
 
 }
