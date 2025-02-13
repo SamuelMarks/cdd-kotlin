@@ -1,10 +1,7 @@
 package io.offscale.converter
 
 import io.offscale.lexer.Lexer
-import io.offscale.parser.ClassBlock
-import io.offscale.parser.KtorRouteBlock
-import io.offscale.parser.Parser
-import io.offscale.parser.SourceBlock
+import io.offscale.parser.*
 import org.yaml.snakeyaml.DumperOptions
 import org.yaml.snakeyaml.Yaml
 import java.io.File
@@ -61,111 +58,152 @@ class Converter {
     }
 
 
+
+
+
+
     fun generateKotlinKtorRoutes(map: Map<String, List<Map<String, Any?>>>): String {
         val result = StringBuilder()
 
+        result.append(
+            """
+        |package com.example.routes
+        |
+        |import io.ktor.server.application.*
+        |import io.ktor.server.response.*
+        |import io.ktor.server.request.*
+        |import io.ktor.server.routing.*
+        |import io.ktor.http.*
+        |
+        |fun Application.configureRouting() {
+        |    routing {
+        """.trimMargin()
+        )
+
+
         map.forEach { (path, routes) ->
-            result.append("route(\"$path\") {\n")
+            result.append("        route(\"$path\") {\n")
 
             routes.forEach { route ->
                 val method = route["method"] as? String ?: ""
                 val summary = route["summary"] as? String ?: ""
-                val description = route["description"] as? String ?: summary
+                val description = route["description"] as? String ?: ""
+                val operationId = route["operationId"] as? String ?: ""
+                val tags = route["tags"] as? List<String> ?: emptyList()
                 val parameters = route["parameters"] as? Map<String, Map<String, Any?>> ?: emptyMap()
                 val responses = route["responses"] as? Map<String, Map<String, Any?>> ?: emptyMap()
                 val requestBody = route["requestBody"] as? Map<String, Map<String, Any?>> ?: emptyMap()
 
-                // comment
-                result.append("    /**\n")
-                if (description.isNotEmpty()) result.append("     * $description\n")
+                // kdoc (comments)
+                result.append("            /**\n")
+                if (summary.isNotEmpty()) result.append("             * $summary\n")
+                if (description.isNotEmpty()) result.append("             *\n             * $description\n")
+                if (operationId.isNotEmpty()) result.append("             *\n             * @operationId $operationId\n")
+                if (tags.isNotEmpty()) result.append("             *\n             * @tags ${tags.joinToString(", ")}\n")
 
-                // parameters
+                // paramenters
                 parameters.forEach { (paramName, paramDetails) ->
                     val paramDesc = paramDetails["description"] as? String ?: ""
                     val required = paramDetails["required"] as? Boolean ?: false
                     val type = paramDetails["type"] as? String ?: "unknown"
-                    result.append("     * @param $paramName ($type, required=$required) $paramDesc\n")
+                    val inWhere = paramDetails["in"] as? String ?: "unknown"
+
+                    result.append("             * @param $paramName ($type, required=$required, in=$inWhere) $paramDesc\n")
                 }
 
                 // request body
                 requestBody.forEach { (contentType, schemaDetails) ->
                     val schemaRef = (schemaDetails["schema"] as? Map<String, String>)?.get("\$ref") ?: "unknown"
-                    result.append("     * @body $contentType -> $schemaRef\n")
+                    result.append("             * @body $contentType -> $schemaRef\n")
                 }
 
                 // responses
                 responses.forEach { (statusCode, responseDetails) ->
-                    val description = responseDetails["description"] as? String ?: ""
+                    val responseDesc = responseDetails["description"] as? String ?: ""
                     val content = responseDetails["content"] as? Map<String, Map<String, Any?>>
                     val schemaRef = content?.values?.firstOrNull()?.get("schema") as? Map<String, String> ?: emptyMap()
                     val ref = schemaRef["\$ref"] ?: "unknown"
-                    result.append("     * @response $statusCode -> $description ($ref)\n")
+                    result.append("             * @response $statusCode -> $responseDesc ($ref)\n")
                 }
 
-                result.append("     */\n")
+                result.append("             */\n")
 
-                // method
-                result.append("    $method {\n")
-                result.append("        // Implementation goes here\n")
-                result.append("    }\n\n")
+                // Adiciona o método HTTP dentro da rota
+                result.append("            $method {\n")
+                result.append("                call.respondText(\"Handling $method at $path\", status = HttpStatusCode.OK)\n")
+                result.append("            }\n\n")
             }
 
-            result.append("}\n\n")
+            result.append("        }\n")
         }
+
+        result.append("    }\n")
+        result.append("}\n")
 
         return result.toString()
     }
 
 
-    fun generateOpenApiPaths(endpointsMap: MutableMap<String, MutableList<MutableMap<String, Any>>>): String {
 
+    fun generateOpenApiPaths(endpointsMap: MutableMap<String, MutableList<MutableMap<String, Any>>>): String {
         val openApiPaths = mutableMapOf<String, Any>()
 
         endpointsMap.forEach { (path, operations) ->
-
             val pathItem = mutableMapOf<String, Any>()
-            operations.forEach { op ->
 
+            operations.forEach { op ->
                 val method = (op["method"] as String).lowercase()
                 val operationObject = mutableMapOf<String, Any>()
 
 
-                operationObject["description"] = op["description"]!!
+                operationObject["operationId"] = op["operationId"] ?: "${method}_${path.replace("/", "_")}"
 
+                operationObject["description"] = op["description"] ?: ""
 
-                if (op.containsKey("produces")) {
-
-                    operationObject["produces"] = listOf(op["produces"]!!)
-                }
 
 
                 if (op.containsKey("parameters")) {
-                    val params = op["parameters"] as Map<String, String>
-
-                    val parametersList = params.map { (name, description) ->
+                    val params = op["parameters"] as List<Map<String, Any>>
+                    val parametersList = params.map { param ->
                         mapOf(
-                            "name" to name,
-                            "in" to "path",
-                            "description" to description,
-                            "required" to true
+                            "name" to param["name"],
+                            "in" to (param["in"] ?: "query"),
+                            "description" to param["description"],
+                            "required" to (param["required"] ?: false),
+                            "schema" to mapOf("type" to param["type"])
                         )
                     }
                     operationObject["parameters"] = parametersList
                 }
 
 
-                val responses = op["responses"] as Map<String, String>
-                val responsesTransformed = responses.mapValues { (_, desc) ->
-                    mapOf("description" to desc)
+                if (op.containsKey("responses")) {
+                    val responses = op["responses"] as Map<String, Map<String, Any>>
+                    val responsesTransformed = responses.mapValues { (_, responseDetails) ->
+                        val responseObj = mutableMapOf<String, Any>(
+                            "description" to (responseDetails["description"] ?: "")
+                        )
+                        if (responseDetails.containsKey("schema")) {
+                            responseObj["content"] = mapOf(
+                                "application/json" to mapOf(
+                                    "schema" to mapOf("\$ref" to responseDetails["schema"])
+                                )
+                            )
+                        }
+                        responseObj
+                    }
+                    operationObject["responses"] = responsesTransformed
                 }
-                operationObject["responses"] = responsesTransformed
 
+
+                if (op.containsKey("security")) {
+                    operationObject["security"] = op["security"] as? String ?: ""
+                }
 
                 pathItem[method] = operationObject
             }
             openApiPaths[path] = pathItem
         }
-
 
         val options = DumperOptions().apply {
             defaultFlowStyle = DumperOptions.FlowStyle.BLOCK
@@ -174,6 +212,7 @@ class Converter {
         val yaml = Yaml(options)
         return yaml.dump(openApiPaths)
     }
+
 
     fun generateOpenApiObject(jsonSchema: Map<String, Any?>): String {
 
@@ -237,13 +276,13 @@ class Converter {
             /** Here should be implemented the functions for the view model:
             *
             * Example:
-            * fun loadCat() {
+            * fun load${className}() {
             *     scope.launch {
             *         try {
-            *             val allCat = repository.getAllCat()
-            *             _cats.value = allCat
+            *             val all${className} = repository.getAll${className}()
+            *             _${className.lowercase()}.value = all${className}
             *         }catch (e: Exception) {
-            *             _error.value = "Failed to load Cat"
+            *             _error.value = "Failed to load ${className}"
             *         }
             *     }
             * }
@@ -630,27 +669,42 @@ class Converter {
 
         schemasToOperation.forEach {(schema, function) ->
             val repo = generateRepository(mutableMapOf("title" to schema),function as String)
-            File(rootPath + "${schema}Repository.kt").writeText(repo)
-        }
-        //print(schemasToOperation)
+            createFileWithDirectories(rootPath + "example/repository/${schema}Repository.kt", repo)
 
+        }
+
+
+    }
+
+    fun createFileWithDirectories(filePath: String, content: String) {
+        val file = File(filePath)
+        val parentDir = file.parentFile
+
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs()
+        }
+
+        file.writeText(content)
     }
 
     fun manage(yamlFile: String) {
         var yamlString = File(rootPath+yamlFile).readText().replace("\r\n", "\n")
         val extractingYaml = openAPISpecsExtract(yamlString)
 
-        // Generating the models
+        // Generating the models and viewmodels
         val schemasFiltered = extractingYaml["SchemasFiltered"] as MutableMap<String,String>
         schemasFiltered.forEach { (model, schema) -> OpenAPItoClassData(schema, model) }
+        schemasFiltered.forEach { (model, schema) -> OpenApiToViewModel(schema,model)}
+
         // Generating the paths
         val paths = extractingYaml["Paths"] as String
         OpenAPIToRoute(paths)
 
-        //Generating the functions for the OperationId
+        //Generating the functions for the OperationId ( in teh repostitories)
         val pathsMap = extractingYaml["PathsMap"] as Map<String, Any?>
         val schemas = extractingYaml["Schemas"] as Map<String, Any?>
         generateOperationId(pathsMap,schemas)
+
 
 
 
@@ -753,20 +807,27 @@ class Converter {
         File(rootPath + "model.yaml").writeText(yamlApi)
     }
 
+    fun OpenApiToViewModel(yamlString: String,model:String) {
+        val jsonSchema = yamlToJsonSchema(yamlString)
+        var view = generateViewModel(jsonSchema)
+        createFileWithDirectories(rootPath + "example/viewmodel/${model}ViewModel.kt", view)
+    }
+
     fun OpenAPItoClassData(yamlString: String,model: String) {
         val jsonSchema = yamlToJsonSchema(yamlString)
         val (modelIR, kdoc) = jsonSchemaToIr(jsonSchema)
         val classText = generateKotlinDataClass(kdoc, modelIR)
-        File(rootPath + "${model}.kt").writeText(classText)
+        createFileWithDirectories(rootPath + "example/model/${model}.kt", classText)
     }
 
     fun RouteToOpenAPI(fileRoutePath: String) {
         val codeRoutes = File(fileRoutePath).readText().replace("\r\n", "\n")
         val parserRoutes = Parser(Lexer(codeRoutes).tokenize())
         val sourceRoutes = parserRoutes.parseCode() as SourceBlock
-        val routes = parserRoutes.findBlock(sourceRoutes, KtorRouteBlock::class) as KtorRouteBlock
+        val routes = parserRoutes.findBlock(sourceRoutes, RoutingBlock::class) as RoutingBlock
+        //print(routes.routes)
         val yamlApi = generateOpenApiPaths(routes.routes)
-        File(rootPath + "route.yaml").writeText(yamlApi)
+        File(rootPath + "Troute.yaml").writeText(yamlApi)
     }
 
     fun OpenAPIToRoute(yamlString: String) {
@@ -783,7 +844,7 @@ fun main() {
     var filepathModel = "C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\example\\model\\Cat.kt"
     var filepathRoute = "C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\example\\api\\CatRoutes.kt"
     //converter.ClassDataToOpenAPI(filepathModel)
-    converter.RouteToOpenAPI(filepathRoute)
+    //converter.RouteToOpenAPI("C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\converter\\routes.kt")
    // converter.OpenAPItoClassData(rootPath+"model.yaml")
     //converter.OpenAPIToRoute(rootPath+"route.yaml")
     val codeClass = File(filepathModel).readText().replace("\r\n", "\n")

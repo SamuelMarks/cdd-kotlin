@@ -6,8 +6,6 @@ import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.DumperOptions
 import kotlin.reflect.KClass
 import io.offscale.lexer.Token
 import io.offscale.lexer.*
@@ -19,42 +17,82 @@ abstract class Block(var name: String, var content: MutableList<Any>) {
     fun kdocToMap(kdoc: String): MutableMap<String, Any> {
         val result = mutableMapOf<String, Any>()
 
-        val descriptionRegex = Regex("""/\*\*\s*\n\s*\*(.+?)\n\s*\*""", RegexOption.DOT_MATCHES_ALL)
+        fun inferTypeFromMeta(meta: String): String {
+            return meta.split(",").firstOrNull()?.trim()?.lowercase() ?: "string"
+        }
+
+        // description
+        val descriptionRegex = Regex("""/\*\*\s*\n\s*\*\s*(.+?)\n\s*\*""", RegexOption.DOT_MATCHES_ALL)
         val descriptionMatch = descriptionRegex.find(kdoc)
         val description = descriptionMatch?.groups?.get(1)?.value?.trim()
         if (!description.isNullOrBlank()) {
             result["description"] = description
         }
 
-        val producesRegex = Regex("""@produces\s+([^\n\r]+)""")
-        val producesMatch = producesRegex.find(kdoc)
-        producesMatch?.groups?.get(1)?.value?.trim()?.let {
-            result["produces"] = it
+        // @operationId
+        val operationIdRegex = Regex("""@operationId\s+([^\n\r]+)""")
+        val operationIdMatch = operationIdRegex.find(kdoc)
+        operationIdMatch?.groups?.get(1)?.value?.trim()?.let {
+            result["operationId"] = it
         }
 
+        // @tags
+        val tagsRegex = Regex("""@tags\s+([^\n\r]+)""")
+        val tagsMatch = tagsRegex.find(kdoc)
+        tagsMatch?.groups?.get(1)?.value?.trim()?.let {
+            result["tags"] = it.split(",").map { tag -> tag.trim() }
+        }
 
-        val responseRegex = Regex("""@response\s+(\d+)\s+(.+)""")
-        val responses = mutableMapOf<String,String>()
+        // @param
+        val paramRegex = Regex("""@param\s+(\w+)\s*\(([^)]+)\)\s*(.+)""")
+        val params = mutableListOf<Map<String, Any>>()
+        paramRegex.findAll(kdoc).forEach { match ->
+            val (name, meta, description) = match.destructured
+
+            val metadata = meta.split(",").mapNotNull {
+                val parts = it.split("=").map { p -> p.trim() }
+                if (parts.size == 2) parts[0] to (parts[1].toBooleanStrictOrNull() ?: parts[1])
+                else null
+            }.toMap()
+
+            val type = inferTypeFromMeta(meta)
+
+            params.add(mapOf(
+                "name" to name,
+                "description" to description,
+                "type" to type
+            ) + metadata)
+        }
+
+        if (params.isNotEmpty()) {
+            result["parameters"] = params
+        }
+
+        // @response
+        val responseRegex = Regex("""@response\s+(\d+|default)\s*->\s*(.+)""")
+        val responses = mutableMapOf<String, Map<String, Any>>()
         responseRegex.findAll(kdoc).forEach { match ->
-            val (code, respDescription) = match.destructured
-            responses[code] = respDescription.trim()
+            val (code, responseText) = match.destructured
+            val schemaRegex = Regex("""\(#/components/schemas/([^)]+)\)""")
+            val schemaMatch = schemaRegex.find(responseText)
+
+            val responseDetails = mutableMapOf<String, Any>("description" to responseText.replace(schemaRegex, "").trim())
+
+            schemaMatch?.groups?.get(1)?.value?.let {
+                responseDetails["schema"] = "#/components/schemas/$it"
+            }
+
+            responses[code] = responseDetails
         }
         if (responses.isNotEmpty()) {
             result["responses"] = responses
         }
 
-        val paramRegex = Regex("""@param\s+(\w+)\s+(.+)""")
-        val params = mutableMapOf<String, String>()
-        paramRegex.findAll(kdoc).forEach { match ->
-            val (paramName, paramDescription) = match.destructured
-            params[paramName] = paramDescription.trim()
-        }
-        if (params.isNotEmpty()) {
-            result["parameters"] = params
-        }
-
         return result
     }
+
+
+
 
     fun toCode(): String {
         var code = ""
@@ -296,6 +334,20 @@ class KtorMethodBlock(content: MutableList<Any>) : Block("KtorMethod", content) 
 
 }
 
+class RoutingBlock(content: MutableList<Any>) : Block("Routing",content) {
+    var routes : MutableMap<String, MutableList<MutableMap<String, Any>>> = mutableMapOf()
+
+    init {
+        content.filterIsInstance<KtorRouteBlock>()
+            .forEach { ktorRouteBlock ->
+                ktorRouteBlock.routes.forEach { (route, methods) ->
+                    routes.getOrPut(route) { mutableListOf() }.addAll(methods)
+                }
+            }
+
+    }
+}
+
 class KtorRouteBlock(content: MutableList<Any>) : Block("KtorRoute", content) {
     var routes : MutableMap<String, MutableList<MutableMap<String, Any>>> = mutableMapOf()
 
@@ -310,6 +362,7 @@ class KtorRouteBlock(content: MutableList<Any>) : Block("KtorRoute", content) {
             if (item is KtorMethodBlock)
                 routes.getOrPut(rootRoute+item.subroute) { mutableListOf() }.add(item.kdoc)
         }
+
     }
 }
 
@@ -371,6 +424,7 @@ class SignalBlock(content: MutableList<Any>) : Block("Signal", content)
 class NumberBlock(content: MutableList<Any>) : Block("Number", content)
 class ParenthesisBlock(content: MutableList<Any>) : Block("Parenthesis", content)
 class BinaryExpressionBlock(content: MutableList<Any>) : Block("BinaryExpression", content)
+
 
 
 class Parser(val tokens: List<Token>) {
@@ -503,6 +557,26 @@ class Parser(val tokens: List<Token>) {
         consumeToken()
         verifyWhiteSpace(elements)
         return KtorRouteBlock(elements)
+    }
+
+    fun parserRouting(): Block {
+        var elements = mutableListOf<Any>()
+        elements.add(actualToken)
+        consumeToken()
+        verifyWhiteSpace(elements)
+        if(actualToken.type!=TokenType.LBRACE) throw Error("parserRouting: expected '{', instead got $actualToken")
+        elements.add(actualToken)
+        consumeToken()
+        verifyWhiteSpace(elements)
+        while(actualToken.value=="route"){
+            elements.add(parserKtorRoutes())
+            verifyWhiteSpace(elements)
+        }
+        if(actualToken.type!=TokenType.RBRACE) throw Error("parserRouting: expected '}', instead got $actualToken")
+        elements.add(actualToken)
+        consumeToken()
+        verifyWhiteSpace(elements)
+        return RoutingBlock(elements)
     }
 
     fun parserKtorRouteMethods(): Block {
@@ -731,6 +805,8 @@ class Parser(val tokens: List<Token>) {
                 TokenType.IDENTIFIER -> {
                     if(actualToken.value=="route"){
                         parserKtorRoutes()
+                    }else if (actualToken.value=="routing") {
+                        parserRouting()
                     }
                     else if (nextToken(2).type == TokenType.ATTRIBUTE ||
                         nextToken(2).type == TokenType.WHITESPACE &&
@@ -758,6 +834,8 @@ class Parser(val tokens: List<Token>) {
                 TokenType.IDENTIFIER -> {
                     if(actualToken.value=="route"){
                         parserKtorRoutes()
+                    } else if (actualToken.value=="routing") {
+                        parserRouting()
                     }
                     else if (nextToken().type == TokenType.ATTRIBUTE ||
                         nextToken().type == TokenType.WHITESPACE &&

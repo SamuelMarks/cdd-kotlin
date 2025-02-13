@@ -1,0 +1,60 @@
+/pets:
+  get:
+    operationId: listPets
+    description: List all pets
+    parameters:
+    - name: limit
+      in: query
+      description: How many items to return at one time (max 100)
+      required: false
+      schema:
+        type: integer
+    responses:
+      '200':
+        description: A paged array of pets
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pets'
+      default:
+        description: unexpected error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+  post:
+    operationId: createPets
+    description: Create a pet
+    responses:
+      '201':
+        description: Null response (unknown)
+      default:
+        description: unexpected error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+/pets/{petId}:
+  get:
+    operationId: showPetById
+    description: Info for a specific pet
+    parameters:
+    - name: petId
+      in: path
+      description: The id of the pet to retrieve
+      required: true
+      schema:
+        type: string
+    responses:
+      '200':
+        description: Expected response to a valid request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pet'
+      default:
+        description: unexpected error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
