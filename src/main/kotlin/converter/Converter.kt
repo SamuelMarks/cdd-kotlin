@@ -40,10 +40,11 @@ class Converter {
 
         arguments.forEachIndexed { index, arg ->
             val paramName = arg["value"] ?: return@forEachIndexed
-            val paramType = arg["type"] ?: "Any"
+            var paramType = arg["type"] ?: "Any"
+            if (!(arg["required"] as Boolean)) paramType+="?"
             val serialName = paramName.lowercase()
 
-            builder.append("\t@SerialName(\"$serialName\")\n")
+            //builder.append("\t@SerialName(\"$serialName\")\n")
             builder.append("\tval $paramName: $paramType")
 
             if (index != arguments.lastIndex) {
@@ -77,6 +78,7 @@ class Converter {
         |
         |fun Application.configureRouting() {
         |    routing {
+        |
         """.trimMargin()
         )
 
@@ -253,58 +255,83 @@ class Converter {
     fun generateViewModel(schema: Map<String, Any?>): String {
         val className = schema["title"] as String
         val properties = schema["properties"] as? Map<String, Map<String, Any?>> ?: emptyMap()
-        val requiredFields = (schema["required"] as? List<String>) ?: emptyList()
 
         val classBuilder = StringBuilder()
+        classBuilder.append("package io.offscale.example.viewmodel\n\n")
         classBuilder.append("import kotlinx.coroutines.flow.MutableStateFlow\n")
         classBuilder.append("import kotlinx.coroutines.flow.StateFlow\n")
         classBuilder.append("import kotlinx.coroutines.CoroutineScope\n")
         classBuilder.append("import kotlinx.coroutines.Dispatchers\n")
         classBuilder.append("import kotlinx.coroutines.launch\n")
-        classBuilder.append("import io.offscale.example.repository.${className}Repository\n\n")
+        classBuilder.append("import io.offscale.example.repository.${className}Repository\n")
+        classBuilder.append("import io.offscale.example.models.${className}\n\n")
+
         classBuilder.append("class ${className}ViewModel(private val repository: ${className}Repository) {\n")
-        classBuilder.append("    val scope = CoroutineScope(Dispatchers.Main)\n\n")
+        classBuilder.append("    private val scope = CoroutineScope(Dispatchers.Main)\n\n")
 
-        properties.forEach { (key, property) ->
-            val type = mapJsonTypeToKotlin(property["type"] as? String ?: "Any")
-            classBuilder.append("    private val _${key} = MutableStateFlow<$type?>(null)\n")
-            classBuilder.append("    val $key: StateFlow<$type?> get() = _${key}\n\n")
-        }
 
-        classBuilder.append("\t"+
-            """
-            /** Here should be implemented the functions for the view model:
-            *
-            * Example:
-            * fun load${className}() {
-            *     scope.launch {
-            *         try {
-            *             val all${className} = repository.getAll${className}()
-            *             _${className.lowercase()}.value = all${className}
-            *         }catch (e: Exception) {
-            *             _error.value = "Failed to load ${className}"
-            *         }
-            *     }
-            * }
-            */
-        """
-        )
-        // Todo: Perhaps, should I also create a mode in which all the routes, repos and viewmodels come
-        //  ready accordingly to the json Schema ?
-        //classBuilder.append("    fun load$className() {\n")
-        //classBuilder.append("        scope.launch {\n")
-        //classBuilder.append("            try {\n")
-        //classBuilder.append("                val all$className = repository.getAll$className()\n")
-        //classBuilder.append("                _${className.lowercase()}s.value = all$className\n")
-        //classBuilder.append("            } catch (e: Exception) {\n")
-        //classBuilder.append("                _error.value = \"Failed to load $className\"\n")
-        //classBuilder.append("            }\n")
-        //classBuilder.append("        }\n")
-        //classBuilder.append("    }\n")
+        classBuilder.append("    private val _${className.lowercase()} = MutableStateFlow<${className}?>(null)\n")
+        classBuilder.append("    val ${className.lowercase()}: StateFlow<${className}?> get() = _${className.lowercase()}\n\n")
+
+        /*classBuilder.append("\t" + """
+    /** Here should be implemented the functions for the view model:
+    *
+    * Example:
+    *
+    *  fun load${className}s() {
+    *      scope.launch {
+    *          try {
+    *              val all${className}s = repository.getAll${className}s()
+    *              _${className.lowercase()}s.value = all${className}s
+    *          } catch (e: Exception) {
+    *              _error.value = "Failed to load ${className}s"
+    *          }
+    *      }
+    *  }
+    *
+    *  fun get${className}ById(id: String) {
+    *      scope.launch {
+    *          try {
+    *              val ${className.lowercase()} = repository.get${className}ById(id)
+    *              if (${className.lowercase()} != null) {
+    *                  _${className.lowercase()}s.value = listOf(${className.lowercase()})
+    *              } else {
+    *                  _error.value = "${className} not found"
+    *              }
+    *          } catch (e: Exception) {
+    *              _error.value = "Error retrieving ${className}"
+    *          }
+    *      }
+    *  }
+    *
+    *  fun add${className}(${className.lowercase()}: ${className}) {
+    *      scope.launch {
+    *          try {
+    *              repository.add${className}(${className.lowercase()})
+    *              load${className}s()
+    *          } catch (e: Exception) {
+    *              _error.value = "Failed to add ${className}"
+    *          }
+    *      }
+    *  }
+    *
+    *  fun remove${className}ById(id: String) {
+    *      scope.launch {
+    *          try {
+    *              repository.remove${className}ById(id)
+    *              load${className}s()
+    *          } catch (e: Exception) {
+    *              _error.value = "Failed to remove ${className}"
+    *          }
+    *      }
+    *  }
+    */
+    """)*/
 
         classBuilder.append("\n}\n")
         return classBuilder.toString()
     }
+
     fun generateRepository(schema: Map<String, Any?>, additionalCode: String = ""): String {
         val className = schema["title"] as String
         val classBuilder = StringBuilder()
@@ -319,14 +346,31 @@ class Converter {
     /** Here should be implemented the functions for the repository:
     *
     * Example:
-    *  fun getAll${className}s(): List<${className}> = ${className.lowercase()}s
     *
-    *  fun get${className}ById(Id: Int): ${className}? = ${className.lowercase()}s.find { it.id == id }
+    *  fun get${className}ById(id: String): ${className}? { 
+    *        // to get a ${className.lowercase()} by ID 
+    *        return ${className.lowercase()}s.find { it.id == id }
+    *  }
+    *
+    *  fun getAll${className}s(): List<${className}> {
+    *        // to get all ${className.lowercase()}s
+    *        return ${className.lowercase()}s
+    *  }
     *
     *  fun add${className}(${className.lowercase()}: ${className}) {
+    *        // to add a ${className.lowercase()}
     *        ${className.lowercase()}s.add(${className.lowercase()})
-    *    }
+    *  }
+    *
+    *  fun remove${className}ById(id: String) { 
+    *        // operation to remove a ${className.lowercase()} 
+    *        val ${className.lowercase()}ToRemove = ${className.lowercase()}s.find { it.id == id }
+    *        if (${className.lowercase()}ToRemove != null) {
+    *            ${className.lowercase()}s.remove(${className.lowercase()}ToRemove)
+    *        }
+    *  }
     */
+
     """
         )
         classBuilder.append("\n}\n")
@@ -502,7 +546,8 @@ class Converter {
             mapOf(
                 "value" to argName,
                 "type" to kotlinType,
-                "default" to if (argName in required) null else argDetails["default"]
+                "default" to if (argName in required) null else argDetails["default"],
+                "required" to if (argName in required) true else false
             )
         } ?: emptyList()
 
@@ -562,7 +607,7 @@ class Converter {
 
             val defaultValue = arg["default"]
 
-            if (defaultValue == null) required.add(argName)
+            if (defaultValue == null && arg["required"] as Boolean) required.add(argName)
 
             properties[argName] = mapOf(
                 "type" to jsonType,
@@ -802,6 +847,7 @@ class Converter {
         val parserClass = Parser(Lexer(codeClass).tokenize())
         val sourceClass = parserClass.parseCode() as SourceBlock
         val dataClass = parserClass.findBlock(sourceClass, ClassBlock::class) as ClassBlock
+        print(dataClass.structure)
         var classDict = IrToJsonSchema(dataClass.structure, sourceClass.kdoc)
         var yamlApi = generateOpenApiObject(classDict)
         File(rootPath + "model.yaml").writeText(yamlApi)
@@ -834,7 +880,7 @@ class Converter {
         var routeMap = OpenApiPathToKtorRouteMap(yamlString)
         //print(routeMap)
         var routeKotlin = generateKotlinKtorRoutes(routeMap)
-        File(rootPath + "routes.kt").writeText(routeKotlin)
+        createFileWithDirectories(rootPath + "example/client/routes.kt", routeKotlin)
     }
 }
 
@@ -843,8 +889,8 @@ fun main() {
     val rootPath = "C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\converter\\"
     var filepathModel = "C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\example\\model\\Cat.kt"
     var filepathRoute = "C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\example\\api\\CatRoutes.kt"
-    //converter.ClassDataToOpenAPI(filepathModel)
-    //converter.RouteToOpenAPI("C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\converter\\routes.kt")
+    converter.ClassDataToOpenAPI("C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\converter\\example\\model\\Pet.kt")
+    converter.RouteToOpenAPI("C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\converter\\example\\client\\routes.kt")
    // converter.OpenAPItoClassData(rootPath+"model.yaml")
     //converter.OpenAPIToRoute(rootPath+"route.yaml")
     val codeClass = File(filepathModel).readText().replace("\r\n", "\n")
@@ -863,10 +909,10 @@ fun main() {
     //File(rootPath+"testRepository.kt").writeText(testRepository)
     //File(rootPath+"testViewmodel.kt").writeText(testViewModel)
 
-    //val yamlText = File(rootPath+"pet.yam").readText()
+    //val yamlText = File(rootPath+"pet.yaml").readText()
     //print(converter.openAPISpecsExtract(yamlText))
 
-    converter.manage("pet.yam")
+    //converter.manage("pet.yaml")
 
 }
 

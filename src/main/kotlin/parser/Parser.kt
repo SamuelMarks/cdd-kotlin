@@ -212,8 +212,8 @@ class ArgumentsBlock(content: MutableList<Any>) : Block("Arguments", content) {
 
 class VarArgumentBlock(content: MutableList<Any>) : Block("VarArgument", content) {
     var argument: MutableMap<String, Any> = mutableMapOf()
-
     init {
+        argument["required"] = true
         for (item in content) {
             when (item) {
                 is IdentifierBlock -> argument["value"] = item.value
@@ -221,7 +221,7 @@ class VarArgumentBlock(content: MutableList<Any>) : Block("VarArgument", content
                 is StringBlock -> argument["default"] = item.toCode()
                 is NumberBlock -> argument["default"] = item.toCode()
                 is AnnotationBlock -> argument["alias"] = item.alias
-
+                TokenType.QUESTION_MARK -> argument["required"] = false
             }
         }
     }
@@ -229,8 +229,8 @@ class VarArgumentBlock(content: MutableList<Any>) : Block("VarArgument", content
 
 class ValArgumentBlock(content: MutableList<Any>) : Block("ValArgument", content) {
     var argument: MutableMap<String, Any> = mutableMapOf()
-
     init {
+        argument["required"] = true
         for (item in content) {
             when (item) {
                 is IdentifierBlock -> argument["value"] = item.value
@@ -238,6 +238,7 @@ class ValArgumentBlock(content: MutableList<Any>) : Block("ValArgument", content
                 is StringBlock -> argument["default"] = item.toCode()
                 is NumberBlock -> argument["default"] = item.toCode()
                 is AnnotationBlock -> argument["alias"] = item.alias
+                is Token -> if(item.type == TokenType.QUESTION_MARK) argument["required"] = false
             }
         }
     }
@@ -245,8 +246,8 @@ class ValArgumentBlock(content: MutableList<Any>) : Block("ValArgument", content
 
 class ArgumentBlock(content: MutableList<Any>) : Block("Argument", content) {
     var argument: MutableMap<String, Any> = mutableMapOf()
-
     init {
+        argument["required"] = true
         for (item in content) {
             when (item) {
                 is IdentifierBlock -> argument["value"] = item.value
@@ -254,7 +255,7 @@ class ArgumentBlock(content: MutableList<Any>) : Block("Argument", content) {
                 is StringBlock -> argument["default"] = item.toCode()
                 is NumberBlock -> argument["default"] = item.toCode()
                 is AnnotationBlock -> argument["alias"] = item.alias
-
+                TokenType.QUESTION_MARK -> argument["required"] = false
             }
         }
     }
@@ -724,6 +725,12 @@ class Parser(val tokens: List<Token>) {
             verifyWhiteSpace(elements)
             elements.add(parserRealExpression())
 
+        }
+
+        if (actualToken.type == TokenType.QUESTION_MARK) {
+            elements.add(actualToken)
+            consumeToken()
+            verifyWhiteSpace(elements)
         }
 
         if (isVariable) {

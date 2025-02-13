@@ -7,7 +7,8 @@ import io.ktor.server.routing.*
 import io.ktor.http.*
 
 fun Application.configureRouting() {
-    routing {        route("/pets") {
+    routing {
+        route("/pets") {
             /**
              * List all pets
              *
