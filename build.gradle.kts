@@ -17,6 +17,8 @@ dependencies {
 
     // For mockito
     testImplementation("org.mockito.kotlin:mockito-kotlin:4.0.0")
+    // For Mockk
+    testImplementation("io.mockk:mockk:1.13.7")
 
     // optional support for rendering markdown in help messages
     implementation("com.github.ajalt.clikt:clikt-markdown:5.0.2")

@@ -635,6 +635,13 @@ class Converter {
         val yaml = Yaml(options)
         val openApiYaml = yaml.load<Map<String, Any>>(yamlString)
 
+        val info = mutableMapOf(
+            "opeanapi" to openApiYaml["openapi"],
+            "info" to openApiYaml["info"],
+            "servers" to openApiYaml["servers"]
+        )
+
+
         val openApiComponents = openApiYaml["components"] as Map<String, *>
         val schemas = openApiComponents["schemas"] as Map<String, MutableMap<String, Any>>
         val paths = openApiYaml["paths"] as Map<String, Any>
@@ -652,7 +659,8 @@ class Converter {
             "SchemasFiltered" to schemasFiltered,
             "Schemas" to schemas,
             "Paths" to pathsYaml,
-            "PathsMap" to pathsMap
+            "PathsMap" to pathsMap,
+            "Info" to yaml.dump(info)
         )
     }
 
@@ -732,7 +740,7 @@ class Converter {
         file.writeText(content)
     }
 
-    fun manage(yamlFile: String) {
+    fun generateAllFromOpenApi(yamlFile: String) {
         var yamlString = File(rootPath+yamlFile).readText().replace("\r\n", "\n")
         val extractingYaml = openAPISpecsExtract(yamlString)
 
@@ -750,10 +758,55 @@ class Converter {
         val schemas = extractingYaml["Schemas"] as Map<String, Any?>
         generateOperationId(pathsMap,schemas)
 
+        //Generate info file
+        createFileWithDirectories(rootPath + "example\\info.yaml", extractingYaml["Info"].toString())
+
+
 
 
 
     }
+
+    fun listFilesFromThisFolder(directoryPath: String): List<String> {
+        val folder = File(directoryPath)
+
+        return if (folder.exists() && folder.isDirectory) {
+            folder.listFiles()?.filter { it.isFile }?.map { directoryPath+"\\"+it.name } ?: emptyList()
+        } else {
+            emptyList()
+        }
+    }
+
+    // TODO: Adjust the indentation
+    fun generateAllForOpenAPi(folderPath: String) {
+        // generation of the schema of the models
+        val modelFiles = listFilesFromThisFolder(rootPath+folderPath+"\\model")
+        var models = mutableListOf<String>()
+        modelFiles.forEach { modelFile -> models.add(ClassDataToOpenAPI(modelFile))}
+        val modelSchemaYaml = "components:\n  schemas:\n  " + models.joinToString("") { it.prependIndent("  ") }
+        // generation of the paths
+        val pathFiles = listFilesFromThisFolder(rootPath+folderPath+"\\client")
+        var routes = mutableListOf<String>()
+        pathFiles.forEach { pathFile -> routes.add(RouteToOpenAPI(pathFile))}
+        val pathSchemaYaml = "paths:\n" + routes.joinToString("") { it.prependIndent("  ") }
+
+        // merging schemas + paths
+        val infoFile =  listFilesFromThisFolder(rootPath+folderPath)[0]
+        val infoContent = File(infoFile).readText().replace("\r\n", "\n")
+        val yamlString = listOf(infoContent,pathSchemaYaml,modelSchemaYaml).joinToString("")
+        val options = DumperOptions().apply {
+            defaultFlowStyle = DumperOptions.FlowStyle.BLOCK
+            isPrettyFlow = true
+            indent = 2
+        }
+        val yaml = Yaml(options)
+
+        val yamlObject = yaml.load<Map<String, Any>>(yamlString)
+        createFileWithDirectories(rootPath+"test.yaml", yaml.dump(yamlObject))
+    }
+
+
+
 
     fun OpenApiPathToKtorRouteMap(yamlString: String): MutableMap<String, MutableList<MutableMap<String, Any?>>> {
         val yaml = Yaml()
@@ -842,15 +895,15 @@ class Converter {
     }
 
 
-    fun ClassDataToOpenAPI(fileModelPath: String) {
+    fun ClassDataToOpenAPI(fileModelPath: String) : String {
         val codeClass = File(fileModelPath).readText().replace("\r\n", "\n")
         val parserClass = Parser(Lexer(codeClass).tokenize())
         val sourceClass = parserClass.parseCode() as SourceBlock
         val dataClass = parserClass.findBlock(sourceClass, ClassBlock::class) as ClassBlock
-        print(dataClass.structure)
         var classDict = IrToJsonSchema(dataClass.structure, sourceClass.kdoc)
         var yamlApi = generateOpenApiObject(classDict)
-        File(rootPath + "model.yaml").writeText(yamlApi)
+        //File(rootPath + "model.yaml").writeText(yamlApi)
+        return yamlApi
     }
 
     fun OpenApiToViewModel(yamlString: String,model:String) {
@@ -866,19 +919,17 @@ class Converter {
         createFileWithDirectories(rootPath + "example/model/${model}.kt", classText)
     }
 
-    fun RouteToOpenAPI(fileRoutePath: String) {
+    fun RouteToOpenAPI(fileRoutePath: String) : String {
         val codeRoutes = File(fileRoutePath).readText().replace("\r\n", "\n")
         val parserRoutes = Parser(Lexer(codeRoutes).tokenize())
         val sourceRoutes = parserRoutes.parseCode() as SourceBlock
         val routes = parserRoutes.findBlock(sourceRoutes, RoutingBlock::class) as RoutingBlock
-        //print(routes.routes)
         val yamlApi = generateOpenApiPaths(routes.routes)
-        File(rootPath + "Troute.yaml").writeText(yamlApi)
+        return yamlApi
     }
 
     fun OpenAPIToRoute(yamlString: String) {
         var routeMap = OpenApiPathToKtorRouteMap(yamlString)
-        //print(routeMap)
         var routeKotlin = generateKotlinKtorRoutes(routeMap)
         createFileWithDirectories(rootPath + "example/client/routes.kt", routeKotlin)
     }
@@ -889,8 +940,8 @@ fun main() {
     val rootPath = "C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\converter\\"
     var filepathModel = "C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\example\\model\\Cat.kt"
     var filepathRoute = "C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\example\\api\\CatRoutes.kt"
-    converter.ClassDataToOpenAPI("C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\converter\\example\\model\\Pet.kt")
-    converter.RouteToOpenAPI("C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\converter\\example\\client\\routes.kt")
+    //converter.ClassDataToOpenAPI("C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\converter\\example\\model\\Pet.kt")
+    //converter.RouteToOpenAPI("C:\\Users\\jeans\\Desktop\\cdd-kotlin\\src\\main\\kotlin\\converter\\example\\client\\routes.kt")
    // converter.OpenAPItoClassData(rootPath+"model.yaml")
     //converter.OpenAPIToRoute(rootPath+"route.yaml")
     val codeClass = File(filepathModel).readText().replace("\r\n", "\n")
@@ -912,7 +963,8 @@ fun main() {
     //val yamlText = File(rootPath+"pet.yaml").readText()
     //print(converter.openAPISpecsExtract(yamlText))
 
-    //converter.manage("pet.yaml")
+    //converter.generateAllFromOpenApi("pet.yaml")
+    converter.generateAllForOpenAPi("example")
 
 }
 
