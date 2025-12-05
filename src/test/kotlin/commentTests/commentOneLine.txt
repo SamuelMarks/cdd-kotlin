@@ -1,2 +1,0 @@
-// This is a simple comment
-//This is also a simple comment

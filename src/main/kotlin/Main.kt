@@ -1,47 +1,24 @@
-package io.offscale
-
-import com.github.ajalt.clikt.core.*
-import com.github.ajalt.clikt.parameters.options.default
-import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.options.versionOption
-import com.github.ajalt.clikt.parameters.types.boolean
-import com.github.ajalt.clikt.parameters.types.enum
-import com.github.ajalt.clikt.parameters.types.file
+import scaffold.ScaffoldGenerator
 import java.io.File
 
-class CddKotlin : CliktCommand() {
-    init {
-        versionOption("0.0.1")
-    }
+fun main() {
+    val generator = ScaffoldGenerator()
 
-    override fun run() {
-       println("run")
-    }
-}
+    // We generate the scaffold into a folder named "generated-project" inside this project
+    // just for demonstration purposes.
+    val outputDir = File("generated-project")
 
-enum class CddTypes { KTOR_CLIENT, KTOR_CLIENT_TESTS, VIEW_MODEL }
+    println("Generating KMP Scaffold into: ${outputDir.absolutePath}...")
 
-
-class Sync : CliktCommand() {
-    private val truth by option(help = "the correct starting point, e.g., the ktor client")
-        .file(canBeDir = false)
-    private val generate by option(help = "what to generate, * to generate everything (default)")
-        .enum<CddTypes> { toCamelCase(it.name) }
-    override fun run() {
-        print("[sync] truth: $truth ; generate: $generate")
-    }
-}
-
-class Emit : CliktCommand() {
-    private val replaceExisting by option(help="whether to override any existing file")
-        .boolean()
-    private val filename by option(help="path to OpenAPI file, default: ./openapi.json")
-        .file(canBeDir = false)
-        .default(File("./openapi.json"))
-
-    override fun run() {
-        print("[Emit] $replaceExisting $filename")
+    try {
+        generator.generate(
+            outputDirectory = outputDir,
+            projectName = "MyGeneratedApp",
+            packageName = "com.example.auto"
+        )
+        println("Success! Open 'generated-project' in IntelliJ to see the result.")
+    } catch (e: Exception) {
+        println("Failed to generate scaffold:")
+        e.printStackTrace()
     }
 }
-
-fun main(args: Array<String>) = CddKotlin().subcommands(Sync(), Emit()).main(args)

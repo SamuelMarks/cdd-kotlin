@@ -1,8 +1,8 @@
 plugins {
-    kotlin("jvm") version "2.1.0"
+    kotlin("jvm") version "2.2.21"
 }
 
-group = "io.offscale"
+group = "org.cdd"
 version = "1.0-SNAPSHOT"
 
 repositories {
@@ -10,23 +10,22 @@ repositories {
 }
 
 dependencies {
-    testImplementation(kotlin("test"))
-    implementation("com.github.ajalt.clikt:clikt:5.0.2")
-    testImplementation("junit:junit:4.13.2")
+    // The Kotlin Standard Library
+    implementation(kotlin("stdlib"))
 
-    // optional support for rendering markdown in help messages
-    implementation("com.github.ajalt.clikt:clikt-markdown:5.0.2")
+    // REQUIRED FOR NEXT STEPS: The Kotin Compiler PSI (Embeddable)
+    // We will use this in Feature D-01/D-02 to parse code
+    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.2.21")
 
-     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-     implementation("io.ktor:ktor-server-core:2.3.3")
-     implementation("io.ktor:ktor-server-netty:2.3.3")
-     implementation("io.ktor:ktor-server-content-negotiation:2.3.3")
-     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.3")
-     implementation("org.yaml:snakeyaml:1.33")
-     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.0")
-    
+    // Testing
+    testImplementation(platform("org.junit:junit-bom:5.10.0"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
 tasks.test {
     useJUnitPlatform()
+}
+
+kotlin {
+    jvmToolchain(17) // Use JDK 17 or higher
 }

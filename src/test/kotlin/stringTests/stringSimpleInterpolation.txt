@@ -1,2 +1,0 @@
-val name="Fulano"
-val string="Hello World $name"
